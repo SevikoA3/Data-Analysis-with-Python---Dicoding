@@ -37,6 +37,9 @@ numeric_cols = filtered_data.select_dtypes(include='number').columns
 binned_data = filtered_data.groupby('datetime_bin')[numeric_cols].mean().reset_index()
 
 # Dashboard utama
+st.text("Nama: Seviko Attalarik P.H")
+st.text("Email: attalarik.handoko@gmail.com")
+st.text("id: seviko")
 st.title("Air Quality and Weather Dashboard")
 st.header("Overview of Pollutant Concentrations and Weather Conditions")
 
