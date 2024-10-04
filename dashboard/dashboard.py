@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # Mengambil data
-main_data = pd.read_csv('main_data.csv')
+main_data = pd.read_csv('dashboard/main_data.csv')
 
 # Mengonversi tahun, bulan, hari, dan jam ke datetime
 main_data['datetime'] = pd.to_datetime(main_data[['year', 'month', 'day', 'hour']])
