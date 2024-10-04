@@ -3,86 +3,110 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Load data
+# Mengambil data
 main_data = pd.read_csv('main_data.csv')
 
-# Convert year, month, day, and hour to datetime
+# Mengonversi tahun, bulan, hari, dan jam ke datetime
 main_data['datetime'] = pd.to_datetime(main_data[['year', 'month', 'day', 'hour']])
 
-# Sidebar for filtering by date range
+# Sidebar untuk memfilter berdasarkan rentang tanggal
 st.sidebar.header("Filter by Date")
 
-# Get the minimum and maximum dates from the data
+# Mendapatkan tanggal minimum dan maksimum dari data
 min_date = main_data['datetime'].min()
 max_date = main_data['datetime'].max()
 
-# Date input with error handling
+# Input tanggal tanpa menggunakan session state
 start_date = pd.to_datetime(st.sidebar.date_input("Start Date", value=min_date, min_value=min_date, max_value=max_date))
 end_date = pd.to_datetime(st.sidebar.date_input("End Date", value=max_date, min_value=min_date, max_value=max_date))
 
-# Filter data by date range
+# Memfilter data berdasarkan rentang tanggal
 filtered_data = main_data[(main_data['datetime'] >= start_date) & (main_data['datetime'] <= end_date)]
 
-# Main dashboard
-st.title("Air Quality and Weather Dashboard")
-st.subheader("Overview of Pollutant Concentrations and Weather Conditions")
+# Membuat input bin di sidebar
+numOfBins = st.sidebar.number_input("Number of Bins", min_value=1, max_value=100, value=30)
 
-# Create bins for datetime
-numOfBins = st.number_input("Number of Bins", min_value=1, max_value=100, value=30)
+# Membuat bin untuk datetime berdasarkan input di sidebar
 filtered_data['datetime_bin'] = pd.cut(filtered_data['datetime'], bins=numOfBins)
 
-# Modify 'datetime_bin' to use the start date of each bin and format as yyyy-mm-dd
+# Mengubah 'datetime_bin' untuk menggunakan tanggal awal setiap bin dan format sebagai yyyy-mm-dd
 filtered_data['datetime_bin'] = filtered_data['datetime_bin'].apply(lambda x: x.left.strftime('%Y-%m-%d'))
 
-# Select only numeric columns for aggregation
+# Memilih hanya kolom numerik untuk agregasi
 numeric_cols = filtered_data.select_dtypes(include='number').columns
 binned_data = filtered_data.groupby('datetime_bin')[numeric_cols].mean().reset_index()
 
-# Pollutant overview
-st.subheader("Pollutants Overview")
-pollutants = ['PM2.5', 'PM10', 'SO2', 'NO2', 'CO', 'O3']
-cols = st.columns(2)
-for i, pollutant in enumerate(pollutants):
-    binned_data[pollutant] = pd.to_numeric(binned_data[pollutant], errors='coerce')
+# Dashboard utama
+st.title("Air Quality and Weather Dashboard")
+st.header("Overview of Pollutant Concentrations and Weather Conditions")
+
+# Gambaran umum polutan
+with st.container():
+    st.subheader("Pollutants Overview")
+    pollutants = ['PM2.5', 'PM10', 'SO2', 'NO2', 'CO', 'O3']
+    cols = st.columns(2)
+    for i, pollutant in enumerate(pollutants):
+        binned_data[pollutant] = pd.to_numeric(binned_data[pollutant], errors='coerce')
+        fig, ax = plt.subplots(figsize=(10, 6))
+        sns.lineplot(data=binned_data, x='datetime_bin', y=pollutant)
+        plt.xlabel('Date')
+        plt.ylabel('Concentration')
+        plt.title(f'{pollutant} Levels Over Time')
+        plt.xticks(rotation=90)
+        cols[i % 2].pyplot(fig)
+
+# Gambaran umum cuaca
+with st.container():
+    st.subheader("Weather Overview")
+    weather = ['TEMP', 'PRES', 'DEWP', 'RAIN', 'WSPM']
+    cols = st.columns(2)
+    for i, w in enumerate(weather):
+        binned_data[w] = pd.to_numeric(binned_data[w], errors='coerce')
+        fig, ax = plt.subplots(figsize=(10, 6))
+        sns.lineplot(data=binned_data, x='datetime_bin', y=w)
+        plt.xlabel('Date')
+        plt.ylabel('Value')
+        plt.title(f'{w} Over Time')
+        plt.xticks(rotation=90)
+        cols[i % 2].pyplot(fig)
+
+# Perbandingan stasiun
+with st.container():
+    st.header("Station Comparison")
+    station = st.selectbox("Select Station", filtered_data['station'].unique())
+    station_data = filtered_data[filtered_data['station'] == station]
+
+    # Plot data spesifik stasiun
+    cols = st.columns(2)
+    for i, pollutant in enumerate(pollutants):
+        station_data[pollutant] = pd.to_numeric(station_data[pollutant], errors='coerce')
+        fig, ax = plt.subplots(figsize=(10, 6))
+        sns.lineplot(data=station_data, x='datetime_bin', y=pollutant)
+        plt.xlabel('Date')
+        plt.ylabel('Concentration')
+        plt.title(f'{pollutant} Levels for Station: {station}')
+        plt.xticks(rotation=90)
+        cols[i % 2].pyplot(fig)
+
+# Plot scatter untuk polutan vs parameter cuaca
+with st.container():
+    st.header("Scatter Plot: Pollutants vs Weather Parameters")
+
+    # Memilih polutan dan parameter cuaca untuk plot scatter
+    cols = st.columns(2)
+    selected_pollutant = cols[0].selectbox("Select Pollutant", pollutants)
+    selected_weather = cols[1].selectbox("Select Weather Parameter", weather)
+
+    # Membuat plot scatter
+    scatter_data = filtered_data[filtered_data['station'] == station]
     fig, ax = plt.subplots(figsize=(10, 6))
-    sns.lineplot(data=binned_data, x='datetime_bin', y=pollutant)
-    plt.xlabel('Date')
-    plt.ylabel('Concentration')
-    plt.title(f'{pollutant} Levels Over Time')
-    plt.xticks(rotation=90)  # Rotate the x-axis labels for better readability
-    cols[i % 2].pyplot(fig)
+    sns.scatterplot(data=scatter_data, x=selected_weather, y=selected_pollutant)
+    plt.xlabel(selected_weather)
+    plt.ylabel(selected_pollutant)
+    plt.title(f'Scatter Plot of {selected_pollutant} vs {selected_weather} for Station: {station}')
+    st.pyplot(fig)
 
-# Weather overview
-st.subheader("Weather Overview")
-weather = ['TEMP', 'PRES', 'DEWP', 'RAIN', 'WSPM']
-cols = st.columns(2)
-for i, w in enumerate(weather):
-    binned_data[w] = pd.to_numeric(binned_data[w], errors='coerce')
-    fig, ax = plt.subplots(figsize=(10, 6))
-    sns.lineplot(data=binned_data, x='datetime_bin', y=w)
-    plt.xlabel('Date')
-    plt.ylabel('Value')
-    plt.title(f'{w} Over Time')
-    plt.xticks(rotation=90)  # Rotate the x-axis labels for better readability
-    cols[i % 2].pyplot(fig)
-
-# Station comparison
-st.subheader("Station Comparison")
-station = st.selectbox("Select Station", filtered_data['station'].unique())
-station_data = filtered_data[filtered_data['station'] == station]
-
-# Plot station-specific data
-cols = st.columns(2)
-for i, pollutant in enumerate(pollutants):
-    station_data[pollutant] = pd.to_numeric(station_data[pollutant], errors='coerce')
-    fig, ax = plt.subplots(figsize=(10, 6))
-    sns.lineplot(data=station_data, x='datetime_bin', y=pollutant)
-    plt.xlabel('Date')
-    plt.ylabel('Concentration')
-    plt.title(f'{pollutant} Levels for Station: {station}')
-    plt.xticks(rotation=90)  # Rotate the x-axis labels for better readability
-    cols[i % 2].pyplot(fig)
-
-# Show descriptive statistics
-st.subheader("Descriptive Statistics")
-st.write(filtered_data.describe())
+# Menampilkan statistik deskriptif
+with st.container():
+    st.subheader("Descriptive Statistics")
+    st.write(filtered_data.describe())
